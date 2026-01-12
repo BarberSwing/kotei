@@ -12,4 +12,11 @@ impl<const E: i32> I128F<E> {
 
     /// The size of this type in bits.
     pub const BITS: u32 = i128::BITS;
+
+    /// Creates a new fixed-point number from an integer significand, equal to `s` ⋅ 2<sup>E</sup>.
+    #[inline(always)]
+    #[must_use]
+    pub const fn new(significand: i128) -> Self {
+        Self(significand)
+    }
 }
