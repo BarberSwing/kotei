@@ -86,4 +86,18 @@ impl<const E: i32> I8F<E> {
     pub const fn cast_unsigned(self) -> U8F<E> {
         U8F(self.0.cast_unsigned())
     }
+
+    /// Returns the fixed-point significand, equal to `self` ⋅ 2<sup>-E</sup>.
+    #[inline(always)]
+    #[must_use]
+    pub const fn significand(self) -> i8 {
+        self.0
+    }
+
+    /// Returns the fixed-point exponent.
+    #[inline(always)]
+    #[must_use]
+    pub const fn exponent(self) -> i32 {
+        E
+    }
 }

@@ -86,4 +86,18 @@ impl<const E: i32> U128F<E> {
     pub const fn cast_signed(self) -> I128F<E> {
         I128F(self.0.cast_signed())
     }
+
+    /// Returns the fixed-point significand, equal to `self` ⋅ 2<sup>-E</sup>.
+    #[inline(always)]
+    #[must_use]
+    pub const fn significand(self) -> u128 {
+        self.0
+    }
+
+    /// Returns the fixed-point exponent.
+    #[inline(always)]
+    #[must_use]
+    pub const fn exponent(self) -> i32 {
+        E
+    }
 }
