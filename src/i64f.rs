@@ -1,4 +1,5 @@
 use ::core::fmt;
+use ::core::ops;
 
 use crate::U64F;
 
@@ -149,6 +150,62 @@ impl<const E: i32> I64F<E> {
     pub const fn signum(self) -> i64 {
         self.0.signum()
     }
+
+    /// Computes `-self`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic on overflow for debug builds, or return a wrapping result for release builds.
+    #[inline(always)]
+    #[must_use]
+    pub const fn neg(self) -> Self {
+        Self(-self.0)
+    }
+
+    /// Computes `-self`, wrapping around at numeric bounds.
+    #[inline(always)]
+    #[must_use]
+    pub const fn wrapping_neg(self) -> Self {
+        Self(self.0.wrapping_neg())
+    }
+
+    /// Computes `-self`.
+    ///
+    /// # Panics
+    ///
+    /// This function will always panic on overflow, regardless of whether debug assertions are enabled.
+    #[inline(always)]
+    #[must_use]
+    pub const fn strict_neg(self) -> Self {
+        Self(self.0.strict_neg())
+    }
+
+    /// Computes `-self`, saturating at numeric bounds instead of overflowing.
+    #[inline(always)]
+    #[must_use]
+    pub const fn saturating_neg(self) -> Self {
+        Self(self.0.saturating_neg())
+    }
+
+    /// Computes `-self`, returning a tuple with a wrapped result and a boolean indicating whether an overflow occurred.
+    #[inline(always)]
+    #[must_use]
+    pub const fn overflowing_neg(self) -> (Self, bool) {
+        let (x, overflow) = self.0.overflowing_neg();
+
+        (Self(x), overflow)
+    }
+
+    /// Computes `-self`, returning None if overflow occurred.
+    #[inline(always)]
+    #[must_use]
+    pub const fn checked_neg(self) -> Option<Self> {
+        let Some(x) = self.0.checked_neg() else {
+            return None;
+        };
+
+        Some(Self(x))
+    }
 }
 
 impl<const E: i32> fmt::Debug for I64F<E> {
@@ -184,5 +241,13 @@ impl<const E: i32> fmt::UpperHex for I64F<E> {
     #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::UpperHex::fmt(&self.to_bits(), f)
+    }
+}
+
+impl<const E: i32> ops::Neg for I64F<E> {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self::neg(self)
     }
 }
