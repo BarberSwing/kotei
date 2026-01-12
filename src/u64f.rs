@@ -100,4 +100,26 @@ impl<const E: i32> U64F<E> {
     pub const fn exponent(self) -> i32 {
         E
     }
+
+    /// Returns the base 2 logarithm of the number, rounded down.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if `self` is zero.
+    #[must_use]
+    pub const fn ilog2(self) -> i32 {
+        self.0.ilog2().cast_signed() + E
+    }
+
+    /// Returns the base 2 logarithm of the number, rounded down, returning None if `self` is zero.
+    #[must_use]
+    pub const fn checked_ilog2(self) -> Option<i32> {
+        let Some(x) = self.0.checked_ilog2() else {
+            return None;
+        };
+
+        let x = x.cast_signed() + E;
+
+        Some(x)
+    }
 }
