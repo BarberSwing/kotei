@@ -122,4 +122,29 @@ impl<const E: i32> I128F<E> {
 
         Some(x)
     }
+
+    /// Returns `true` if `self` is positive and `false` if the number is zero or negative.
+    #[inline(always)]
+    #[must_use]
+    pub const fn is_positive(self) -> bool {
+        self.0.is_positive()
+    }
+
+    /// Returns `true` if `self` is negative and `false` if the number is zero or positive.
+    #[inline(always)]
+    #[must_use]
+    pub const fn is_negative(self) -> bool {
+        self.0.is_negative()
+    }
+
+    /// Returns a number representing the sign of `self`.
+    ///
+    ///  - `0` if the number is zero.
+    ///  - `1` if the number is positive.
+    ///  - `-1` if the number is negative.
+    #[inline(always)]
+    #[must_use]
+    pub const fn signum(self) -> i128 {
+        self.0.signum()
+    }
 }
