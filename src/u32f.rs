@@ -1,3 +1,5 @@
+use ::core::fmt;
+
 use crate::I32F;
 
 /// A 32-bit unsigned fixed-point type.
@@ -121,5 +123,41 @@ impl<const E: i32> U32F<E> {
         let x = x.cast_signed() + E;
 
         Some(x)
+    }
+}
+
+impl<const E: i32> fmt::Debug for U32F<E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "U32F<{E}")?;
+
+        f.debug_tuple(">").field(&self.0).finish()
+    }
+}
+
+impl<const E: i32> fmt::Binary for U32F<E> {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Binary::fmt(&self.to_bits(), f)
+    }
+}
+
+impl<const E: i32> fmt::LowerHex for U32F<E> {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::LowerHex::fmt(&self.to_bits(), f)
+    }
+}
+
+impl<const E: i32> fmt::Octal for U32F<E> {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Octal::fmt(&self.to_bits(), f)
+    }
+}
+
+impl<const E: i32> fmt::UpperHex for U32F<E> {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::UpperHex::fmt(&self.to_bits(), f)
     }
 }

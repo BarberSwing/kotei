@@ -1,3 +1,5 @@
+use ::core::fmt;
+
 use crate::U128F;
 
 /// A 128-bit signed fixed-point type.
@@ -146,5 +148,41 @@ impl<const E: i32> I128F<E> {
     #[must_use]
     pub const fn signum(self) -> i128 {
         self.0.signum()
+    }
+}
+
+impl<const E: i32> fmt::Debug for I128F<E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "I128F<{E}")?;
+
+        f.debug_tuple(">").field(&self.0).finish()
+    }
+}
+
+impl<const E: i32> fmt::Binary for I128F<E> {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Binary::fmt(&self.to_bits(), f)
+    }
+}
+
+impl<const E: i32> fmt::LowerHex for I128F<E> {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::LowerHex::fmt(&self.to_bits(), f)
+    }
+}
+
+impl<const E: i32> fmt::Octal for I128F<E> {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Octal::fmt(&self.to_bits(), f)
+    }
+}
+
+impl<const E: i32> fmt::UpperHex for I128F<E> {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::UpperHex::fmt(&self.to_bits(), f)
     }
 }
