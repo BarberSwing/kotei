@@ -1,3 +1,5 @@
+use crate::I64F;
+
 /// A 64-bit unsigned fixed-point type.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(transparent)]
@@ -76,5 +78,12 @@ impl<const E: i32> U64F<E> {
     #[must_use]
     pub const fn to_le_bytes(self) -> [u8; 8] {
         self.0.to_le_bytes()
+    }
+
+    /// Reinterprets as a signed fixed-point number of the same size.
+    #[inline(always)]
+    #[must_use]
+    pub const fn cast_signed(self) -> I64F<E> {
+        I64F(self.0.cast_signed())
     }
 }

@@ -1,3 +1,5 @@
+use crate::U16F;
+
 /// A 16-bit signed fixed-point type.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(transparent)]
@@ -76,5 +78,12 @@ impl<const E: i32> I16F<E> {
     #[must_use]
     pub const fn to_le_bytes(self) -> [u8; 2] {
         self.0.to_le_bytes()
+    }
+
+    /// Reinterprets as an unsigned fixed-point number of the same size.
+    #[inline(always)]
+    #[must_use]
+    pub const fn cast_unsigned(self) -> U16F<E> {
+        U16F(self.0.cast_unsigned())
     }
 }

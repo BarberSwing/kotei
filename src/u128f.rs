@@ -1,3 +1,5 @@
+use crate::I128F;
+
 /// A 128-bit unsigned fixed-point type.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(transparent)]
@@ -76,5 +78,12 @@ impl<const E: i32> U128F<E> {
     #[must_use]
     pub const fn to_le_bytes(self) -> [u8; 16] {
         self.0.to_le_bytes()
+    }
+
+    /// Reinterprets as a signed fixed-point number of the same size.
+    #[inline(always)]
+    #[must_use]
+    pub const fn cast_signed(self) -> I128F<E> {
+        I128F(self.0.cast_signed())
     }
 }
