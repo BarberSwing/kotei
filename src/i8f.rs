@@ -19,4 +19,62 @@ impl<const E: i32> I8F<E> {
     pub const fn new(significand: i8) -> Self {
         Self(significand)
     }
+
+    /// Raw transutation from [`u8`].
+    #[inline(always)]
+    #[must_use]
+    pub const fn from_bits(bits: u8) -> Self {
+        Self(bits.cast_signed())
+    }
+
+    /// Creates a fixed-point number from its memory representation as a byte array in native endian byte order.
+    ///
+    /// As the target platform's native endianness is used, portable code likely wants to use [`from_be_bytes`](Self::from_be_bytes) or [`from_le_bytes`](Self::from_le_bytes), as appropriate, instead.
+    #[inline(always)]
+    #[must_use]
+    pub const fn from_ne_bytes(bytes: [u8; 1]) -> Self {
+        Self(i8::from_ne_bytes(bytes))
+    }
+
+    /// Creates a fixed-point number from its memory representation as a byte array in big endian byte order.
+    #[inline(always)]
+    #[must_use]
+    pub const fn from_be_bytes(bytes: [u8; 1]) -> Self {
+        Self(i8::from_be_bytes(bytes))
+    }
+
+    /// Creates a fixed-point number from its memory representation as a byte array in little endian byte order.
+    #[inline(always)]
+    #[must_use]
+    pub const fn from_le_bytes(bytes: [u8; 1]) -> Self {
+        Self(i8::from_le_bytes(bytes))
+    }
+
+    /// Raw transmutation to [`u8`].
+    #[inline(always)]
+    #[must_use]
+    pub const fn to_bits(self) -> u8 {
+        self.0.cast_unsigned()
+    }
+
+    /// Returns the memory representation of this fixed-point number as a byte array in native byte order.
+    #[inline(always)]
+    #[must_use]
+    pub const fn to_ne_bytes(self) -> [u8; 1] {
+        self.0.to_ne_bytes()
+    }
+
+    /// Returns the memory representation of this fixed-point number as a byte array in big-endian (network) byte order.
+    #[inline(always)]
+    #[must_use]
+    pub const fn to_be_bytes(self) -> [u8; 1] {
+        self.0.to_be_bytes()
+    }
+
+    /// Returns the memory representation of this fixed-point number as a byte array in little-endian byte order.
+    #[inline(always)]
+    #[must_use]
+    pub const fn to_le_bytes(self) -> [u8; 1] {
+        self.0.to_le_bytes()
+    }
 }
