@@ -2,6 +2,7 @@ use ::core::fmt;
 use ::core::ops;
 
 use crate::U32F;
+use crate::error::TryFromFloatError;
 
 /// A 32-bit signed fixed-point type.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -23,6 +24,184 @@ impl<const E: i32> I32F<E> {
     #[must_use]
     pub const fn new(significand: i32) -> Self {
         Self(significand)
+    }
+
+    /// Tries to create a new fixed-point number from [`f32`]. Returns the nearest multiple of 2<sup>E</sup> to `value`, rounded to the number with even least significant digits if `value` is halfway between two multiples of 2<sup>E</sup>. This returns an error if the source value is not a number, rounds to less than [`Self::MIN`], or rounds to greater than [`Self::MAX`].
+    #[must_use]
+    pub const fn try_from_f32(value: f32) -> Result<Self, TryFromFloatError> {
+        const fn _try_from_f32(value: f32, e: i32) -> Result<i32, TryFromFloatError> {
+            const BIAS: i32 = 127;
+            const EXPONENT_BITS: i32 = 8;
+            const SIGNIFICAND_BITS: i32 = 23;
+
+            const EXPONENT_MASK: u32 = !(!0 << EXPONENT_BITS) << SIGNIFICAND_BITS;
+            const IMPLICIT_BIT: u32 = 1 << SIGNIFICAND_BITS;
+            const SIGNIFICAND_MASK: u32 = !(!0 << SIGNIFICAND_BITS);
+            const SIGN_MASK: u32 = 1 << EXPONENT_BITS + SIGNIFICAND_BITS;
+            const ZERO_MASK: u32 = !(!0 << EXPONENT_BITS + SIGNIFICAND_BITS);
+
+            let bits = value.to_bits();
+
+            if bits & ZERO_MASK == 0 {
+                return Ok(0);
+            }
+
+            let mut significand = bits & SIGNIFICAND_MASK;
+            let mut exponent = bits & EXPONENT_MASK;
+            let sign = bits & SIGN_MASK;
+
+            if exponent == EXPONENT_MASK {
+                if significand != 0 {
+                    return Err(TryFromFloatError::Nan);
+                } else if sign != 0 {
+                    return Err(TryFromFloatError::Underflow);
+                } else {
+                    return Err(TryFromFloatError::Overflow);
+                }
+            }
+
+            if exponent != 0 {
+                significand |= IMPLICIT_BIT;
+                exponent >>= SIGNIFICAND_BITS;
+            } else {
+                exponent = 1;
+            }
+
+            let mut shift = exponent as i32;
+            shift = shift.wrapping_sub(const { BIAS + SIGNIFICAND_BITS });
+            shift = e.saturating_sub(shift);
+
+            if shift > const { SIGNIFICAND_BITS + 1 } {
+                significand = 0;
+            } else if shift > 0 {
+                let mut round = !(!0u32 << shift.wrapping_sub(1));
+                round = round.wrapping_add(significand >> shift & 1);
+                significand = significand.wrapping_add(round);
+                significand >>= shift;
+            } else {
+                let shift = shift.wrapping_neg().cast_unsigned();
+
+                if shift > significand.leading_zeros() {
+                    if sign != 0 {
+                        return Err(TryFromFloatError::Underflow);
+                    } else {
+                        return Err(TryFromFloatError::Overflow);
+                    }
+                }
+
+                significand <<= shift;
+            }
+
+            if sign != 0 {
+                if significand > const { i32::MIN.unsigned_abs() } {
+                    return Err(TryFromFloatError::Underflow);
+                }
+
+                significand = significand.wrapping_neg();
+            } else {
+                if significand > const { i32::MAX.unsigned_abs() } {
+                    return Err(TryFromFloatError::Overflow);
+                }
+            }
+
+            let significand = significand.cast_signed();
+
+            Ok(significand)
+        }
+
+        match _try_from_f32(value, E) {
+            Ok(s) => Ok(Self(s)),
+            Err(err) => Err(err),
+        }
+    }
+
+    /// Tries to create a new fixed-point number from [`f64`]. Returns the nearest multiple of 2<sup>E</sup> to `value`, rounded to the number with even least significant digits if `value` is halfway between two multiples of 2<sup>E</sup>. This returns an error if the source value is not a number, rounds to less than [`Self::MIN`], or rounds to greater than [`Self::MAX`].
+    #[must_use]
+    pub const fn try_from_f64(value: f64) -> Result<Self, TryFromFloatError> {
+        const fn _try_from_f64(value: f64, e: i32) -> Result<i32, TryFromFloatError> {
+            const BIAS: i32 = 1023;
+            const EXPONENT_BITS: i32 = 11;
+            const SIGNIFICAND_BITS: i32 = 52;
+
+            const EXPONENT_MASK: u64 = !(!0 << EXPONENT_BITS) << SIGNIFICAND_BITS;
+            const IMPLICIT_BIT: u64 = 1 << SIGNIFICAND_BITS;
+            const SIGNIFICAND_MASK: u64 = !(!0 << SIGNIFICAND_BITS);
+            const SIGN_MASK: u64 = 1 << EXPONENT_BITS + SIGNIFICAND_BITS;
+            const ZERO_MASK: u64 = !(!0 << EXPONENT_BITS + SIGNIFICAND_BITS);
+
+            let bits = value.to_bits();
+
+            if bits & ZERO_MASK == 0 {
+                return Ok(0);
+            }
+
+            let mut significand = bits & SIGNIFICAND_MASK;
+            let mut exponent = bits & EXPONENT_MASK;
+            let sign = bits & SIGN_MASK;
+
+            if exponent == EXPONENT_MASK {
+                if significand != 0 {
+                    return Err(TryFromFloatError::Nan);
+                } else if sign != 0 {
+                    return Err(TryFromFloatError::Underflow);
+                } else {
+                    return Err(TryFromFloatError::Overflow);
+                }
+            }
+
+            if exponent != 0 {
+                significand |= IMPLICIT_BIT;
+                exponent >>= SIGNIFICAND_BITS;
+            } else {
+                exponent = 1;
+            }
+
+            let mut shift = exponent as i32;
+            shift = shift.wrapping_sub(const { BIAS + SIGNIFICAND_BITS });
+            shift = e.saturating_sub(shift);
+
+            if shift > const { SIGNIFICAND_BITS + 1 } {
+                significand = 0;
+            } else if shift > 0 {
+                let mut round = !(!0u64 << shift.wrapping_sub(1));
+                round = round.wrapping_add(significand >> shift & 1);
+                significand = significand.wrapping_add(round);
+                significand >>= shift;
+            } else {
+                let shift = shift.wrapping_neg().cast_unsigned();
+
+                if shift > significand.leading_zeros() {
+                    if sign != 0 {
+                        return Err(TryFromFloatError::Underflow);
+                    } else {
+                        return Err(TryFromFloatError::Overflow);
+                    }
+                }
+
+                significand <<= shift;
+            }
+
+            if sign != 0 {
+                if significand > const { i32::MIN.unsigned_abs() as u64 } {
+                    return Err(TryFromFloatError::Underflow);
+                }
+
+                significand = significand.wrapping_neg();
+            } else {
+                if significand > const { i32::MAX.unsigned_abs() as u64 } {
+                    return Err(TryFromFloatError::Overflow);
+                }
+            }
+
+            let significand = significand.cast_signed() as i32;
+
+            Ok(significand)
+        }
+
+        match _try_from_f64(value, E) {
+            Ok(s) => Ok(Self(s)),
+            Err(err) => Err(err),
+        }
     }
 
     /// Raw transutation from [`u32`].
@@ -249,5 +428,272 @@ impl<const E: i32> ops::Neg for I32F<E> {
 
     fn neg(self) -> Self::Output {
         Self::neg(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn try_from_f32_infinity() {
+        assert_eq!(
+            I32F::<{ i32::MIN }>::try_from_f32(f32::INFINITY),
+            Err(TryFromFloatError::Overflow)
+        );
+        assert_eq!(
+            I32F::<0>::try_from_f32(f32::INFINITY),
+            Err(TryFromFloatError::Overflow)
+        );
+        assert_eq!(
+            I32F::<{ i32::MAX }>::try_from_f32(f32::INFINITY),
+            Err(TryFromFloatError::Overflow)
+        );
+    }
+
+    #[test]
+    fn try_from_f32_max() {
+        assert_eq!(
+            I32F::<{ f32::MAX_EXP }>::try_from_f32(f32::MAX),
+            Ok(I32F::new(1))
+        );
+    }
+
+    #[test]
+    fn try_from_f32_max_negative() {
+        assert_eq!(
+            I32F::<{ f32::MIN_EXP - 1 }>::try_from_f32(-f32::MIN_POSITIVE),
+            Ok(I32F::new(-1))
+        );
+    }
+
+    #[test]
+    fn try_from_f32_max_negative_subnormal() {
+        assert_eq!(
+            I32F::<{ f32::MIN_EXP - f32::MANTISSA_DIGITS.cast_signed() }>::try_from_f32(
+                (-0.0f32).next_down()
+            ),
+            Ok(I32F::new(-1))
+        );
+    }
+
+    #[test]
+    fn try_from_f32_min() {
+        assert_eq!(
+            I32F::<{ f32::MAX_EXP }>::try_from_f32(f32::MIN),
+            Ok(I32F::new(-1))
+        );
+    }
+
+    #[test]
+    fn try_from_f32_min_positive() {
+        assert_eq!(
+            I32F::<{ f32::MIN_EXP - 1 }>::try_from_f32(f32::MIN_POSITIVE),
+            Ok(I32F::new(1))
+        );
+    }
+
+    #[test]
+    fn try_from_f32_min_positive_subnormal() {
+        assert_eq!(
+            I32F::<{ f32::MIN_EXP - f32::MANTISSA_DIGITS.cast_signed() }>::try_from_f32(
+                0.0f32.next_up()
+            ),
+            Ok(I32F::new(1))
+        );
+    }
+
+    #[test]
+    fn try_from_f32_nan() {
+        assert_eq!(
+            I32F::<{ i32::MIN }>::try_from_f32(f32::NAN),
+            Err(TryFromFloatError::Nan)
+        );
+        assert_eq!(
+            I32F::<0>::try_from_f32(f32::NAN),
+            Err(TryFromFloatError::Nan)
+        );
+        assert_eq!(
+            I32F::<{ i32::MAX }>::try_from_f32(f32::NAN),
+            Err(TryFromFloatError::Nan)
+        );
+    }
+
+    #[test]
+    fn try_from_f32_neg_infinity() {
+        assert_eq!(
+            I32F::<{ i32::MIN }>::try_from_f32(f32::NEG_INFINITY),
+            Err(TryFromFloatError::Underflow)
+        );
+        assert_eq!(
+            I32F::<0>::try_from_f32(f32::NEG_INFINITY),
+            Err(TryFromFloatError::Underflow)
+        );
+        assert_eq!(
+            I32F::<{ i32::MAX }>::try_from_f32(f32::NEG_INFINITY),
+            Err(TryFromFloatError::Underflow)
+        );
+    }
+
+    #[test]
+    fn try_from_f32_round_ties_even() {
+        assert_eq!(I32F::<-1>::try_from_f32(-1.25), Ok(I32F::new(-2)));
+        assert_eq!(I32F::<-1>::try_from_f32(-0.75), Ok(I32F::new(-2)));
+        assert_eq!(I32F::<-1>::try_from_f32(-0.25), Ok(I32F::new(0)));
+        assert_eq!(I32F::<-1>::try_from_f32(0.25), Ok(I32F::new(0)));
+        assert_eq!(I32F::<-1>::try_from_f32(0.75), Ok(I32F::new(2)));
+        assert_eq!(I32F::<-1>::try_from_f32(1.25), Ok(I32F::new(2)));
+
+        assert_eq!(I32F::<0>::try_from_f32(-2.5), Ok(I32F::new(-2)));
+        assert_eq!(I32F::<0>::try_from_f32(-1.5), Ok(I32F::new(-2)));
+        assert_eq!(I32F::<0>::try_from_f32(-0.5), Ok(I32F::new(0)));
+        assert_eq!(I32F::<0>::try_from_f32(0.5), Ok(I32F::new(0)));
+        assert_eq!(I32F::<0>::try_from_f32(1.5), Ok(I32F::new(2)));
+        assert_eq!(I32F::<0>::try_from_f32(2.5), Ok(I32F::new(2)));
+
+        assert_eq!(I32F::<1>::try_from_f32(-5.0), Ok(I32F::new(-2)));
+        assert_eq!(I32F::<1>::try_from_f32(-3.0), Ok(I32F::new(-2)));
+        assert_eq!(I32F::<1>::try_from_f32(-1.0), Ok(I32F::new(0)));
+        assert_eq!(I32F::<1>::try_from_f32(1.0), Ok(I32F::new(0)));
+        assert_eq!(I32F::<1>::try_from_f32(3.0), Ok(I32F::new(2)));
+        assert_eq!(I32F::<1>::try_from_f32(5.0), Ok(I32F::new(2)));
+    }
+
+    #[test]
+    fn try_from_f32_zero() {
+        assert_eq!(I32F::<{ i32::MIN }>::try_from_f32(0.0), Ok(I32F::new(0)));
+        assert_eq!(I32F::<0>::try_from_f32(0.0), Ok(I32F::new(0)));
+        assert_eq!(I32F::<{ i32::MAX }>::try_from_f32(0.0), Ok(I32F::new(0)));
+    }
+
+    #[test]
+    fn try_from_f64_infinity() {
+        assert_eq!(
+            I32F::<{ i32::MIN }>::try_from_f64(f64::INFINITY),
+            Err(TryFromFloatError::Overflow)
+        );
+        assert_eq!(
+            I32F::<0>::try_from_f64(f64::INFINITY),
+            Err(TryFromFloatError::Overflow)
+        );
+        assert_eq!(
+            I32F::<{ i32::MAX }>::try_from_f64(f64::INFINITY),
+            Err(TryFromFloatError::Overflow)
+        );
+    }
+
+    #[test]
+    fn try_from_f64_max() {
+        assert_eq!(
+            I32F::<{ f64::MAX_EXP }>::try_from_f64(f64::MAX),
+            Ok(I32F::new(1))
+        );
+    }
+
+    #[test]
+    fn try_from_f64_max_negative() {
+        assert_eq!(
+            I32F::<{ f64::MIN_EXP - 1 }>::try_from_f64(-f64::MIN_POSITIVE),
+            Ok(I32F::new(-1))
+        );
+    }
+
+    #[test]
+    fn try_from_f64_max_negative_subnormal() {
+        assert_eq!(
+            I32F::<{ f64::MIN_EXP - f64::MANTISSA_DIGITS.cast_signed() }>::try_from_f64(
+                (-0.0f64).next_down()
+            ),
+            Ok(I32F::new(-1))
+        );
+    }
+
+    #[test]
+    fn try_from_f64_min() {
+        assert_eq!(
+            I32F::<{ f64::MAX_EXP }>::try_from_f64(f64::MIN),
+            Ok(I32F::new(-1))
+        );
+    }
+
+    #[test]
+    fn try_from_f64_min_positive() {
+        assert_eq!(
+            I32F::<{ f64::MIN_EXP - 1 }>::try_from_f64(f64::MIN_POSITIVE),
+            Ok(I32F::new(1))
+        );
+    }
+
+    #[test]
+    fn try_from_f64_min_positive_subnormal() {
+        assert_eq!(
+            I32F::<{ f64::MIN_EXP - f64::MANTISSA_DIGITS.cast_signed() }>::try_from_f64(
+                0.0f64.next_up()
+            ),
+            Ok(I32F::new(1))
+        );
+    }
+
+    #[test]
+    fn try_from_f64_nan() {
+        assert_eq!(
+            I32F::<{ i32::MIN }>::try_from_f64(f64::NAN),
+            Err(TryFromFloatError::Nan)
+        );
+        assert_eq!(
+            I32F::<0>::try_from_f64(f64::NAN),
+            Err(TryFromFloatError::Nan)
+        );
+        assert_eq!(
+            I32F::<{ i32::MAX }>::try_from_f64(f64::NAN),
+            Err(TryFromFloatError::Nan)
+        );
+    }
+
+    #[test]
+    fn try_from_f64_neg_infinity() {
+        assert_eq!(
+            I32F::<{ i32::MIN }>::try_from_f64(f64::NEG_INFINITY),
+            Err(TryFromFloatError::Underflow)
+        );
+        assert_eq!(
+            I32F::<0>::try_from_f64(f64::NEG_INFINITY),
+            Err(TryFromFloatError::Underflow)
+        );
+        assert_eq!(
+            I32F::<{ i32::MAX }>::try_from_f64(f64::NEG_INFINITY),
+            Err(TryFromFloatError::Underflow)
+        );
+    }
+
+    #[test]
+    fn try_from_f64_round_ties_even() {
+        assert_eq!(I32F::<-1>::try_from_f64(-1.25), Ok(I32F::new(-2)));
+        assert_eq!(I32F::<-1>::try_from_f64(-0.75), Ok(I32F::new(-2)));
+        assert_eq!(I32F::<-1>::try_from_f64(-0.25), Ok(I32F::new(0)));
+        assert_eq!(I32F::<-1>::try_from_f64(0.25), Ok(I32F::new(0)));
+        assert_eq!(I32F::<-1>::try_from_f64(0.75), Ok(I32F::new(2)));
+        assert_eq!(I32F::<-1>::try_from_f64(1.25), Ok(I32F::new(2)));
+
+        assert_eq!(I32F::<0>::try_from_f64(-2.5), Ok(I32F::new(-2)));
+        assert_eq!(I32F::<0>::try_from_f64(-1.5), Ok(I32F::new(-2)));
+        assert_eq!(I32F::<0>::try_from_f64(-0.5), Ok(I32F::new(0)));
+        assert_eq!(I32F::<0>::try_from_f64(0.5), Ok(I32F::new(0)));
+        assert_eq!(I32F::<0>::try_from_f64(1.5), Ok(I32F::new(2)));
+        assert_eq!(I32F::<0>::try_from_f64(2.5), Ok(I32F::new(2)));
+
+        assert_eq!(I32F::<1>::try_from_f64(-5.0), Ok(I32F::new(-2)));
+        assert_eq!(I32F::<1>::try_from_f64(-3.0), Ok(I32F::new(-2)));
+        assert_eq!(I32F::<1>::try_from_f64(-1.0), Ok(I32F::new(0)));
+        assert_eq!(I32F::<1>::try_from_f64(1.0), Ok(I32F::new(0)));
+        assert_eq!(I32F::<1>::try_from_f64(3.0), Ok(I32F::new(2)));
+        assert_eq!(I32F::<1>::try_from_f64(5.0), Ok(I32F::new(2)));
+    }
+
+    #[test]
+    fn try_from_f64_zero() {
+        assert_eq!(I32F::<{ i32::MIN }>::try_from_f64(0.0), Ok(I32F::new(0)));
+        assert_eq!(I32F::<0>::try_from_f64(0.0), Ok(I32F::new(0)));
+        assert_eq!(I32F::<{ i32::MAX }>::try_from_f64(0.0), Ok(I32F::new(0)));
     }
 }

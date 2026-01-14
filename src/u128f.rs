@@ -1,6 +1,7 @@
 use ::core::fmt;
 
 use crate::I128F;
+use crate::error::TryFromFloatError;
 
 /// A 128-bit unsigned fixed-point type.
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -22,6 +23,170 @@ impl<const E: i32> U128F<E> {
     #[must_use]
     pub const fn new(significand: u128) -> Self {
         Self(significand)
+    }
+
+    /// Tries to create a new fixed-point number from [`f32`]. Returns the nearest multiple of 2<sup>E</sup> to `value`, rounded to the number with even least significant digits if `value` is halfway between two multiples of 2<sup>E</sup>. This returns an error if the source value is not a number, rounds to less than [`Self::MIN`], or rounds to greater than [`Self::MAX`].
+    #[must_use]
+    pub const fn try_from_f32(value: f32) -> Result<Self, TryFromFloatError> {
+        const fn _try_from_f32(value: f32, e: i32) -> Result<u128, TryFromFloatError> {
+            const BIAS: i32 = 127;
+            const EXPONENT_BITS: i32 = 8;
+            const SIGNIFICAND_BITS: i32 = 23;
+
+            const EXPONENT_MASK: u32 = !(!0 << EXPONENT_BITS) << SIGNIFICAND_BITS;
+            const IMPLICIT_BIT: u32 = 1 << SIGNIFICAND_BITS;
+            const SIGNIFICAND_MASK: u32 = !(!0 << SIGNIFICAND_BITS);
+            const SIGN_MASK: u32 = 1 << EXPONENT_BITS + SIGNIFICAND_BITS;
+            const ZERO_MASK: u32 = !(!0 << EXPONENT_BITS + SIGNIFICAND_BITS);
+
+            let bits = value.to_bits();
+
+            if bits & ZERO_MASK == 0 {
+                return Ok(0);
+            }
+
+            let mut significand = bits & SIGNIFICAND_MASK;
+            let mut exponent = bits & EXPONENT_MASK;
+            let sign = bits & SIGN_MASK;
+
+            if exponent == EXPONENT_MASK {
+                if significand != 0 {
+                    return Err(TryFromFloatError::Nan);
+                } else if sign != 0 {
+                    return Err(TryFromFloatError::Underflow);
+                } else {
+                    return Err(TryFromFloatError::Overflow);
+                }
+            }
+
+            if exponent != 0 {
+                significand |= IMPLICIT_BIT;
+                exponent >>= SIGNIFICAND_BITS;
+            } else {
+                exponent = 1;
+            }
+
+            let mut shift = exponent as i32;
+            shift = shift.wrapping_sub(const { BIAS + SIGNIFICAND_BITS });
+            shift = e.saturating_sub(shift);
+
+            let significand = if shift > const { SIGNIFICAND_BITS + 1 } {
+                0
+            } else if shift > 0 {
+                let mut round = !(!0u32 << shift.wrapping_sub(1));
+                round = round.wrapping_add(significand >> shift & 1);
+                significand = significand.wrapping_add(round);
+                significand >>= shift;
+
+                significand as u128
+            } else {
+                let shift = shift.wrapping_neg().cast_unsigned();
+                let significand = significand as u128;
+
+                if shift > significand.leading_zeros() {
+                    if sign != 0 {
+                        return Err(TryFromFloatError::Underflow);
+                    } else {
+                        return Err(TryFromFloatError::Overflow);
+                    }
+                }
+
+                significand << shift
+            };
+
+            if sign != 0 && significand > u128::MIN {
+                return Err(TryFromFloatError::Underflow);
+            }
+
+            Ok(significand)
+        }
+
+        match _try_from_f32(value, E) {
+            Ok(s) => Ok(Self(s)),
+            Err(err) => Err(err),
+        }
+    }
+
+    /// Tries to create a new fixed-point number from [`f64`]. Returns the nearest multiple of 2<sup>E</sup> to `value`, rounded to the number with even least significant digits if `value` is halfway between two multiples of 2<sup>E</sup>. This returns an error if the source value is not a number, rounds to less than [`Self::MIN`], or rounds to greater than [`Self::MAX`].
+    #[must_use]
+    pub const fn try_from_f64(value: f64) -> Result<Self, TryFromFloatError> {
+        const fn _try_from_f64(value: f64, e: i32) -> Result<u128, TryFromFloatError> {
+            const BIAS: i32 = 1023;
+            const EXPONENT_BITS: i32 = 11;
+            const SIGNIFICAND_BITS: i32 = 52;
+
+            const EXPONENT_MASK: u64 = !(!0 << EXPONENT_BITS) << SIGNIFICAND_BITS;
+            const IMPLICIT_BIT: u64 = 1 << SIGNIFICAND_BITS;
+            const SIGNIFICAND_MASK: u64 = !(!0 << SIGNIFICAND_BITS);
+            const SIGN_MASK: u64 = 1 << EXPONENT_BITS + SIGNIFICAND_BITS;
+            const ZERO_MASK: u64 = !(!0 << EXPONENT_BITS + SIGNIFICAND_BITS);
+
+            let bits = value.to_bits();
+
+            if bits & ZERO_MASK == 0 {
+                return Ok(0);
+            }
+
+            let mut significand = bits & SIGNIFICAND_MASK;
+            let mut exponent = bits & EXPONENT_MASK;
+            let sign = bits & SIGN_MASK;
+
+            if exponent == EXPONENT_MASK {
+                if significand != 0 {
+                    return Err(TryFromFloatError::Nan);
+                } else if sign != 0 {
+                    return Err(TryFromFloatError::Underflow);
+                } else {
+                    return Err(TryFromFloatError::Overflow);
+                }
+            }
+
+            if exponent != 0 {
+                significand |= IMPLICIT_BIT;
+                exponent >>= SIGNIFICAND_BITS;
+            } else {
+                exponent = 1;
+            }
+
+            let mut shift = exponent as i32;
+            shift = shift.wrapping_sub(const { BIAS + SIGNIFICAND_BITS });
+            shift = e.saturating_sub(shift);
+
+            let significand = if shift > const { SIGNIFICAND_BITS + 1 } {
+                0
+            } else if shift > 0 {
+                let mut round = !(!0u64 << shift.wrapping_sub(1));
+                round = round.wrapping_add(significand >> shift & 1);
+                significand = significand.wrapping_add(round);
+                significand >>= shift;
+
+                significand as u128
+            } else {
+                let shift = shift.wrapping_neg().cast_unsigned();
+                let significand = significand as u128;
+
+                if shift > significand.leading_zeros() {
+                    if sign != 0 {
+                        return Err(TryFromFloatError::Underflow);
+                    } else {
+                        return Err(TryFromFloatError::Overflow);
+                    }
+                }
+
+                significand << shift
+            };
+
+            if sign != 0 && significand > u128::MIN {
+                return Err(TryFromFloatError::Underflow);
+            }
+
+            Ok(significand)
+        }
+
+        match _try_from_f64(value, E) {
+            Ok(s) => Ok(Self(s)),
+            Err(err) => Err(err),
+        }
     }
 
     /// Raw transutation from [`u128`].
@@ -159,5 +324,208 @@ impl<const E: i32> fmt::UpperHex for U128F<E> {
     #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::UpperHex::fmt(&self.to_bits(), f)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn try_from_f32_infinity() {
+        assert_eq!(
+            U128F::<{ i32::MIN }>::try_from_f32(f32::INFINITY),
+            Err(TryFromFloatError::Overflow)
+        );
+        assert_eq!(
+            U128F::<0>::try_from_f32(f32::INFINITY),
+            Err(TryFromFloatError::Overflow)
+        );
+        assert_eq!(
+            U128F::<{ i32::MAX }>::try_from_f32(f32::INFINITY),
+            Err(TryFromFloatError::Overflow)
+        );
+    }
+
+    #[test]
+    fn try_from_f32_max() {
+        assert_eq!(
+            U128F::<{ f32::MAX_EXP }>::try_from_f32(f32::MAX),
+            Ok(U128F::new(1))
+        );
+    }
+
+    #[test]
+    fn try_from_f32_min_positive() {
+        assert_eq!(
+            U128F::<{ f32::MIN_EXP - 1 }>::try_from_f32(f32::MIN_POSITIVE),
+            Ok(U128F::new(1))
+        );
+    }
+
+    #[test]
+    fn try_from_f32_min_positive_subnormal() {
+        assert_eq!(
+            U128F::<{ f32::MIN_EXP - f32::MANTISSA_DIGITS.cast_signed() }>::try_from_f32(
+                0.0f32.next_up()
+            ),
+            Ok(U128F::new(1))
+        );
+    }
+
+    #[test]
+    fn try_from_f32_nan() {
+        assert_eq!(
+            U128F::<{ i32::MIN }>::try_from_f32(f32::NAN),
+            Err(TryFromFloatError::Nan)
+        );
+        assert_eq!(
+            U128F::<0>::try_from_f32(f32::NAN),
+            Err(TryFromFloatError::Nan)
+        );
+        assert_eq!(
+            U128F::<{ i32::MAX }>::try_from_f32(f32::NAN),
+            Err(TryFromFloatError::Nan)
+        );
+    }
+
+    #[test]
+    fn try_from_f32_neg_infinity() {
+        assert_eq!(
+            U128F::<{ i32::MIN }>::try_from_f32(f32::NEG_INFINITY),
+            Err(TryFromFloatError::Underflow)
+        );
+        assert_eq!(
+            U128F::<0>::try_from_f32(f32::NEG_INFINITY),
+            Err(TryFromFloatError::Underflow)
+        );
+        assert_eq!(
+            U128F::<{ i32::MAX }>::try_from_f32(f32::NEG_INFINITY),
+            Err(TryFromFloatError::Underflow)
+        );
+    }
+
+    #[test]
+    fn try_from_f32_round_ties_even() {
+        assert_eq!(U128F::<-1>::try_from_f32(-0.25), Ok(U128F::new(0)));
+        assert_eq!(U128F::<-1>::try_from_f32(0.25), Ok(U128F::new(0)));
+        assert_eq!(U128F::<-1>::try_from_f32(0.75), Ok(U128F::new(2)));
+        assert_eq!(U128F::<-1>::try_from_f32(1.25), Ok(U128F::new(2)));
+
+        assert_eq!(U128F::<0>::try_from_f32(-0.5), Ok(U128F::new(0)));
+        assert_eq!(U128F::<0>::try_from_f32(0.5), Ok(U128F::new(0)));
+        assert_eq!(U128F::<0>::try_from_f32(1.5), Ok(U128F::new(2)));
+        assert_eq!(U128F::<0>::try_from_f32(2.5), Ok(U128F::new(2)));
+
+        assert_eq!(U128F::<1>::try_from_f32(-1.0), Ok(U128F::new(0)));
+        assert_eq!(U128F::<1>::try_from_f32(1.0), Ok(U128F::new(0)));
+        assert_eq!(U128F::<1>::try_from_f32(3.0), Ok(U128F::new(2)));
+        assert_eq!(U128F::<1>::try_from_f32(5.0), Ok(U128F::new(2)));
+    }
+
+    #[test]
+    fn try_from_f32_zero() {
+        assert_eq!(U128F::<{ i32::MIN }>::try_from_f32(0.0), Ok(U128F::new(0)));
+        assert_eq!(U128F::<0>::try_from_f32(0.0), Ok(U128F::new(0)));
+        assert_eq!(U128F::<{ i32::MAX }>::try_from_f32(0.0), Ok(U128F::new(0)));
+    }
+
+    #[test]
+    fn try_from_f64_infinity() {
+        assert_eq!(
+            U128F::<{ i32::MIN }>::try_from_f64(f64::INFINITY),
+            Err(TryFromFloatError::Overflow)
+        );
+        assert_eq!(
+            U128F::<0>::try_from_f64(f64::INFINITY),
+            Err(TryFromFloatError::Overflow)
+        );
+        assert_eq!(
+            U128F::<{ i32::MAX }>::try_from_f64(f64::INFINITY),
+            Err(TryFromFloatError::Overflow)
+        );
+    }
+
+    #[test]
+    fn try_from_f64_max() {
+        assert_eq!(
+            U128F::<{ f64::MAX_EXP }>::try_from_f64(f64::MAX),
+            Ok(U128F::new(1))
+        );
+    }
+
+    #[test]
+    fn try_from_f64_min_positive() {
+        assert_eq!(
+            U128F::<{ f64::MIN_EXP - 1 }>::try_from_f64(f64::MIN_POSITIVE),
+            Ok(U128F::new(1))
+        );
+    }
+
+    #[test]
+    fn try_from_f64_min_positive_subnormal() {
+        assert_eq!(
+            U128F::<{ f64::MIN_EXP - f64::MANTISSA_DIGITS.cast_signed() }>::try_from_f64(
+                0.0f64.next_up()
+            ),
+            Ok(U128F::new(1))
+        );
+    }
+
+    #[test]
+    fn try_from_f64_nan() {
+        assert_eq!(
+            U128F::<{ i32::MIN }>::try_from_f64(f64::NAN),
+            Err(TryFromFloatError::Nan)
+        );
+        assert_eq!(
+            U128F::<0>::try_from_f64(f64::NAN),
+            Err(TryFromFloatError::Nan)
+        );
+        assert_eq!(
+            U128F::<{ i32::MAX }>::try_from_f64(f64::NAN),
+            Err(TryFromFloatError::Nan)
+        );
+    }
+
+    #[test]
+    fn try_from_f64_neg_infinity() {
+        assert_eq!(
+            U128F::<{ i32::MIN }>::try_from_f64(f64::NEG_INFINITY),
+            Err(TryFromFloatError::Underflow)
+        );
+        assert_eq!(
+            U128F::<0>::try_from_f64(f64::NEG_INFINITY),
+            Err(TryFromFloatError::Underflow)
+        );
+        assert_eq!(
+            U128F::<{ i32::MAX }>::try_from_f64(f64::NEG_INFINITY),
+            Err(TryFromFloatError::Underflow)
+        );
+    }
+
+    #[test]
+    fn try_from_f64_round_ties_even() {
+        assert_eq!(U128F::<-1>::try_from_f64(-0.25), Ok(U128F::new(0)));
+        assert_eq!(U128F::<-1>::try_from_f64(0.25), Ok(U128F::new(0)));
+        assert_eq!(U128F::<-1>::try_from_f64(0.75), Ok(U128F::new(2)));
+        assert_eq!(U128F::<-1>::try_from_f64(1.25), Ok(U128F::new(2)));
+
+        assert_eq!(U128F::<0>::try_from_f64(-0.5), Ok(U128F::new(0)));
+        assert_eq!(U128F::<0>::try_from_f64(0.5), Ok(U128F::new(0)));
+        assert_eq!(U128F::<0>::try_from_f64(1.5), Ok(U128F::new(2)));
+        assert_eq!(U128F::<0>::try_from_f64(2.5), Ok(U128F::new(2)));
+
+        assert_eq!(U128F::<1>::try_from_f64(-1.0), Ok(U128F::new(0)));
+        assert_eq!(U128F::<1>::try_from_f64(1.0), Ok(U128F::new(0)));
+        assert_eq!(U128F::<1>::try_from_f64(3.0), Ok(U128F::new(2)));
+        assert_eq!(U128F::<1>::try_from_f64(5.0), Ok(U128F::new(2)));
+    }
+
+    #[test]
+    fn try_from_f64_zero() {
+        assert_eq!(U128F::<{ i32::MIN }>::try_from_f64(0.0), Ok(U128F::new(0)));
+        assert_eq!(U128F::<0>::try_from_f64(0.0), Ok(U128F::new(0)));
+        assert_eq!(U128F::<{ i32::MAX }>::try_from_f64(0.0), Ok(U128F::new(0)));
     }
 }
