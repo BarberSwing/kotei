@@ -6,6 +6,8 @@
 
 #![no_std]
 
+pub mod error;
+
 mod i8f;
 pub use i8f::*;
 
